@@ -6,14 +6,19 @@ from dotenv import load_dotenv
 import logging
 
 # Загрузка переменных окружения
-load_dotenv()
+load_dotenv()  # Это нужно только для локальной разработки. На Railway переменные загружаются автоматически.
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # Например: https://your-app.up.railway.app/webhook
+BOT_TOKEN = os.getenv("BOT_TOKEN")  # Загружаем из переменной окружения на Railway
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # Загружаем из переменной окружения на Railway
 
 # Логи
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Проверка переменных окружения
+if not BOT_TOKEN or not WEBHOOK_URL:
+    logger.error("Переменные окружения не найдены!")
+    raise ValueError("BOT_TOKEN или WEBHOOK_URL не заданы!")
 
 # FastAPI
 app = FastAPI()
@@ -41,8 +46,11 @@ async def handle_web_app_data(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def startup():
     telegram_app.add_handler(CommandHandler("start", start))
     telegram_app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_web_app_data))
-    await telegram_app.bot.set_webhook(WEBHOOK_URL + "/webhook")
-    logger.info("Webhook установлен!")
+    
+    # Установка Webhook
+    webhook_url = WEBHOOK_URL + "/webhook"
+    await telegram_app.bot.set_webhook(webhook_url)
+    logger.info(f"Webhook установлен на {webhook_url}!")
 
 @app.post("/webhook")
 async def webhook(request: Request):
@@ -50,3 +58,7 @@ async def webhook(request: Request):
     update = Update.de_json(data, telegram_app.bot)
     await telegram_app.process_update(update)
     return {"ok": True}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=8000)
